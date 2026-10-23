@@ -1,0 +1,53 @@
+{
+  "checked_at_utc": "2026-10-21T10:14:47.539690+00:00",
+  "method": "Python standard-library read-only data inspection; not model or application evaluation",
+  "scifact": {
+    "corpus_documents": 5183,
+    "unique_document_ids": 5183,
+    "abstract_sentences": 45952,
+    "splits": {
+      "train": {
+        "claims": 809,
+        "unique_claim_ids": 809,
+        "evidence_key_present_in_all_records": true,
+        "claims_with_nonempty_evidence": 505,
+        "rationale_sets": 957,
+        "claim_document_pairs_with_alternative_rationales": 268,
+        "rationale_label_counts": {
+          "CONTRADICT": 341,
+          "SUPPORT": 616
+        },
+        "invalid_evidence_references": []
+      },
+      "dev": {
+        "claims": 300,
+        "unique_claim_ids": 300,
+        "evidence_key_present_in_all_records": true,
+        "claims_with_nonempty_evidence": 188,
+        "rationale_sets": 338,
+        "claim_document_pairs_with_alternative_rationales": 85,
+        "rationale_label_counts": {
+          "CONTRADICT": 122,
+          "SUPPORT": 216
+        },
+        "invalid_evidence_references": []
+      },
+      "test": {
+        "claims": 300,
+        "unique_claim_ids": 300,
+        "evidence_key_present_in_all_records": false,
+        "claims_with_nonempty_evidence": null,
+        "rationale_sets": null,
+        "claim_document_pairs_with_alternative_rationales": null,
+        "rationale_label_counts": null,
+        "invalid_evidence_references": []
+      }
+    },
+    "claim_id_intersections": {
+      "train_dev": 0,
+      "train_test": 0,
+      "dev_test": 0
+    },
+    "test_note": "Missing evidence means unavailable annotations; it is not a NOINFO gold label."
+  }
+}

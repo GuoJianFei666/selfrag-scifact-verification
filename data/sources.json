@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "project": "selfrag-scifact",
+  "checked_date": "2026-10-21",
+  "sources": [
+    {
+      "id": "scifact",
+      "title": "SciFact",
+      "repository": "allenai/scifact",
+      "commit": "68b98a56d93e0f9da0d2aab4e6c3294699a0f72e",
+      "url": "https://github.com/allenai/scifact/tree/68b98a56d93e0f9da0d2aab4e6c3294699a0f72e",
+      "license_note": "主张/证据CC BY 4.0；摘要ODC-By 1.0；代码Apache-2.0",
+      "used_for": "主张、摘要、证据集及评价数据",
+      "projects": [
+        "selfrag-scifact"
+      ],
+      "checked_date": "2026-10-21"
+    },
+    {
+      "id": "selfrag",
+      "title": "Self-RAG",
+      "repository": "AkariAsai/self-rag",
+      "commit": "1fcdc420e48f50a7d7ab1ece5494221b93252e99",
+      "url": "https://github.com/AkariAsai/self-rag/tree/1fcdc420e48f50a7d7ab1ece5494221b93252e99",
+      "license_note": "基础代码、模型分别依上游条款；本仓库不分发权重或上游代码",
+      "used_for": "科研证据核验的上游模型与方法",
+      "projects": [
+        "selfrag-scifact"
+      ],
+      "checked_date": "2026-10-21"
+    }
+  ]
+}

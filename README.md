@@ -1,45 +1,88 @@
-# Self-RAG 科研证据核验与溯源检索
+# Self-RAG 科研证据核验
 
-围绕一条英文科研主张，检索相关摘要，逐篇判断支持、反驳或信息不足，并将证据句映射回原始文献。核验报告保留结论、原句依据和处理状态，供逐条复核。
+检索一条英文科研主张的相关摘要，逐篇判断支持、反驳或信息不足，并将证据句映射回原始文献。网页保留原句编号、判断状态和模型版本，支持导出逐文献报告。
 
-**技术栈**：Python · PyTorch / Transformers · PEFT / LoRA · Contriever · FAISS · SelfRAG-7B · SciFact。
+**Python · PyTorch / Transformers · PEFT / LoRA · Contriever · FAISS · FastAPI · SciFact**
 
-本仓库公开架构、数据与输出契约、评价方案、来源记录及公开数据复核工具。核验应用与领域适配源码暂不公开，模型权重不随仓库分发。
+![真实检索与原句阅读界面](docs/images/retrieval-preview.png)
 
-## 技术与个人工作
+## 当前验证
 
-- **检索与数据**：冻结 Contriever 编码器，用标题与摘要建立 FAISS 精确索引；保留原始文档、句子编号与可替代证据集。先按主张来源组划分数据，再生成变体；变体继承父主张的划分。
-- **领域适配**：基于已发布 SelfRAG-7B 组织领域 LoRA SFT，统一输入序列化与目标 token 监督，将检索摘要、关系标签和证据句选择统一到训练样本中。
-- **引用回查**：模型选择当前视图中的句子编号，系统绑定文档、映射原始句子编号并取回原句，分别处理结构校验和证据语义判断。
-- **评价设计**：使用 Full / Keep / Break / Neutral 证据视图区分完整信息、替代证据保留和证据破坏，分开报告关系、证据句、联合指标与引用有效性。
-- **应用交付**：围绕科研信息检索生成逐文献核验报告，保留标题、文档 ID、原句、关系、处理状态与版本，支持人工复核。
+|项目|实际结果|
+|---|---|
+|公开源码|数据、检索、模型接口、LoRA训练、评测、API和网页|
+|工程测试|51项通过，含微型随机Llama的B1/B2/B3训练、保存和冷重载|
+|真实检索|5183篇摘要，固定Contriever与768维FAISS精确索引|
+|train top-5检索诊断|gold文档召回486/564，即86.17%；至少命中一篇451/505，即89.31%|
+|发布SelfRAG 7B|尚未加载权重；未运行正式领域训练或性能对照|
+|来源分组|train对齐529/809；其余280条保留，完整来源划分未生成|
 
-## 处理流程
+工程测试验证代码，检索诊断使用训练集。两者均不代表7B模型的关系判断成绩。详细记录见[验证说明](docs/VALIDATION.md)。
 
-```mermaid
-flowchart LR
-  A[英文科研主张] --> B[Contriever / FAISS 摘要检索]
-  B --> C[SelfRAG-7B + 领域 LoRA]
-  C --> D[逐文献关系与证据句编号]
-  D --> E[绑定文档并回查原句]
-  E --> F[核验报告与人工复核]
+## 安装与测试
+
+要求Python 3.12。以下命令在Windows PowerShell中执行，工作目录为仓库根目录。
+
+```powershell
+git clone https://github.com/GuoJianFei666/selfrag-scifact-verification.git
+cd selfrag-scifact-verification
+python -m venv .venv
+& '.venv/Scripts/python.exe' -m pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu
+& '.venv/Scripts/python.exe' -m pip install -e '.[test]'
+& '.venv/Scripts/python.exe' -m pytest -q
 ```
 
-关系为 `SUPPORT`、`CONTRADICT`、`NOINFO`。处理状态与关系标签分别记录，执行失败保留为独立状态。范围为英文摘要级、逐文献核验。
+`requirements-lock-cpu.txt`记录本次本机环境。GPU运行需要安装与设备匹配的PyTorch/CUDA；NF4为可选入口，本次未验证其CUDA兼容性。依赖安装不下载7B模型权重。
 
-## 阅读入口
+## 运行真实检索界面
 
-| 内容 | 文件 |
-| --- | --- |
-| 组件与数据流 | [架构说明](docs/ARCHITECTURE.md) |
-| 输入、输出与编号规则 | [数据契约](docs/DATA-CONTRACT.md) |
-| 四视图与评价口径 | [评价说明](docs/EVALUATION.md) |
-| 公开文件和使用路径 | [使用说明](docs/USAGE.md) |
-| 公开数据复核记录 | [原有检查说明](docs/DATA-INSPECTION.md)、[机器结果](data/inspection-results.json) |
-| 数据、模型和代码来源 | [来源与许可](docs/SOURCES.md)、[第三方说明](THIRD_PARTY_NOTICES.md) |
+先导入官方数据，再构建索引。运行文件放在忽略的`var/`目录。
 
-## 数据与结果口径
+```powershell
+$env:OMP_NUM_THREADS = '4'
+$env:MKL_NUM_THREADS = '4'
+& '.venv/Scripts/python.exe' -m evidence_rag import-data --download `
+  --archive var/downloads/scifact-data.tar.gz --output var/scifact
+& '.venv/Scripts/python.exe' -m evidence_rag build-index `
+  --data var/scifact --output var/contriever-index --cache var/model-cache `
+  --revision 2bd46a25019aeea091fd42d1f0fd4801675cf699
+.\Start.ps1
+```
 
-SciFact 的公开规模和划分见[数据检查记录](docs/DATA-INSPECTION.md)，属于上游公开数据。检索不读取 gold 关系、证据标签或 cited_doc_ids。已定义的 B0—B3 对照中，B3 配对目标仍待比较，尚无实测增益。本公开包不附个人 F1、训练耗时或企业采用指标。
+打开 <http://127.0.0.1:8787>。CPU首次构建索引需要下载Contriever权重并编码全部语料。数据和索引输出目录要求为空，已有输出可直接复用。页面显示实际服务状态；缺少模型时禁用核验按钮，接口返回503。
 
-项目说明与独立公开数据复核工具沿用 [MIT 许可](LICENSE)；SciFact、Self-RAG 代码与模型分别遵循上游许可。
+## 模型核验与训练
+
+```powershell
+& '.venv/Scripts/python.exe' -m evidence_rag fetch-model --cache var/model-cache --include-weights
+```
+
+该命令显式下载固定SelfRAG版本。准备好合适的运行环境，并将adapter及加载参数写入`configs/model.yaml`后，使用`Start.ps1 -WithModel`开启核验。默认只读取本地缓存。
+
+领域训练前必须完成来源划分和干预语义复核：
+
+```powershell
+Invoke-WebRequest -Uri 'https://scifact.s3.us-west-2.amazonaws.com/release/latest/claims_with_citances.jsonl' `
+  -OutFile var/downloads/claims_with_citances.jsonl
+& '.venv/Scripts/python.exe' -m evidence_rag audit-sources --data var/scifact `
+  --sources var/downloads/claims_with_citances.jsonl --audit var/source-audit.json --splits var/splits.json
+```
+
+当前公开来源文件有280条train主张未对齐，该命令会保存缺项后退出，不产生正式split。不会猜测来源组、随机分配缺项或静默删样本。完整操作见[训练与评测](docs/EXPERIMENTS.md)。
+
+B1使用原始领域SFT；B2加入已复核干预；B3在同一SFT序列上增加方向与保持损失。模型选择只用内部model_select，校准只用calibration。正式dev运行绑定冻结的方法、视图、数据、模型、检索缓存及结果回执。
+
+## 实现与阅读入口
+
+|路径|职责|
+|---|---|
+|`evidence_rag/data.py`、`views.py`|原始数据、来源审计、替代证据视图、两轮复核|
+|`evidence_rag/retrieval.py`|固定编码器、精确索引、真实检索缓存|
+|`evidence_rag/serialization.py`、`model.py`|目标mask、完整标签概率、结构化生成和模型合约|
+|`evidence_rag/training.py`|LoRA、配对损失、检查点、预算和重载|
+|`evidence_rag/evaluation.py`、`protocol.py`、`workflow.py`|官方指标、联合诊断、校准和冻结输入|
+|`evidence_rag/app.py`、`pipeline.py`、`web/`|FastAPI、来源绑定、报告和网页|
+|`tests/`、`.github/workflows/`|工程测试及CPU CI|
+|`data/`、`tools/inspect_public_data.py`|此前公开的数据来源与独立静态复核工具|
+
+关系为`SUPPORT`、`CONTRADICT`、`NOINFO`，处理状态独立记录。范围限英文摘要级、逐文献核验。详见[架构](docs/ARCHITECTURE.md)、[输出契约](docs/DATA-CONTRACT.md)及[评价说明](docs/EVALUATION.md)。上游继承关系见[版本记录](UPSTREAM.md)和[第三方说明](THIRD_PARTY_NOTICES.md)。新增代码沿用[MIT许可](LICENSE)；模型权重和数据分别遵循上游许可，不随源码分发。

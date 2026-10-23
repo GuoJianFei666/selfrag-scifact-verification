@@ -1,0 +1,17 @@
+run: B2
+seed: 42
+device: cpu
+precision: float32
+quantization: none
+cache_dir: var/model-cache
+split_manifest: var/splits.json
+common_optimizer: var/common_optimizer.json
+max_length: 2048
+epochs: 3
+gradient_accumulation: 16
+learning_rate: 0.0001
+lora:
+  r: 16
+  lora_alpha: 32
+  lora_dropout: 0.05
+  target_modules: [q_proj, v_proj]

@@ -1,7 +1,7 @@
-# 使用与阅读说明
+# 使用说明
 
-README与架构说明对应处理流程；数据契约规定文档绑定、句子编号与原句回查；评价说明定义证据视图和指标口径。
+仓库现已公开应用、数据处理、训练和评测源码。安装、导入、建索引与网页启动见[README](../README.md)，训练与冻结评测见[实验流程](EXPERIMENTS.md)，实际执行范围见[验证说明](VALIDATION.md)。
 
-`tools/inspect_public_data.py`为此前公开的独立数据复核工具，具体参数以文件中的argparse定义和`--help`为准。该入口仅复核公开数据；核验应用与训练源码暂不公开。
+所有命令从仓库根目录运行。Windows解释器位于`.venv/Scripts/python.exe`，运行文件位于`var/`，该目录不入库。`Start.ps1`默认启动真实检索；加入`-WithModel`后读取`configs/model.yaml`加载本地模型。
 
-若复用方法，数据从[AllenAI SciFact](https://github.com/allenai/scifact)获取；模型及原始方法从[Self-RAG](https://github.com/AkariAsai/self-rag)和相应模型发布页获取，并分别检查其环境、使用限制和许可。`data/`保存来源、哈希与既有统计，不包含模型权重或完整摘要原文。
+`tools/inspect_public_data.py`保留此前公开的静态复核入口，独立于新应用。`data/`保留来源、哈希与历史统计，不包含完整数据、缓存或模型权重。

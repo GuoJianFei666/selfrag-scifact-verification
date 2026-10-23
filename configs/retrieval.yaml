@@ -1,0 +1,7 @@
+model_id: facebook/contriever
+revision: 2bd46a25019aeea091fd42d1f0fd4801675cf699
+pooling: attention-mask-mean
+similarity: inner_product
+normalize: false
+max_length: 512
+top_k: 5

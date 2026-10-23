@@ -1,0 +1,12 @@
+model_id: selfrag/selfrag_llama2_7b
+revision: 190261383b0779ff66d2f95a73c7ad267d94b820
+device: cpu
+precision: float32
+quantization: none
+max_length: 2048
+max_new_tokens: 96
+temperature: 1.0
+threshold: 0.0
+local_files_only: true
+cache_dir: var/model-cache
+adapter: null

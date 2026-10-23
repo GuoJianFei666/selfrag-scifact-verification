@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Self-RAG · 科研证据核验</title><link rel="stylesheet" href="/assets/style.css"><script src="/assets/app.js" defer></script></head>
+<body>
+<header><div class="identity"><span class="mark">S/R</span><div><strong>科研证据核验</strong><span>SELF-RAG / SCIENTIFIC CLAIMS</span></div></div>
+<div class="health"><span id="corpus">正在读取语料</span><i></i><span id="retriever">检索器检查中</span><i></i><span id="model">模型检查中</span></div></header>
+<main>
+<aside>
+  <p class="eyebrow">01 / CLAIM</p><h1>从一条主张开始</h1>
+  <form id="claim-form"><label for="claim">英文科研主张</label><textarea id="claim" rows="6" required maxlength="5000" placeholder="输入需要核对的科学主张"></textarea>
+  <label for="top-k">候选文献数量</label><select id="top-k"><option value="3">3 篇</option><option value="5" selected>5 篇</option><option value="10">10 篇</option></select>
+  <div class="actions"><button id="search" type="submit" disabled>检索摘要</button><button id="verify" type="button" class="secondary" disabled>核验主张</button></div></form>
+  <p id="availability" class="hint">正在读取服务状态。</p>
+  <details class="versions"><summary>检索范围与版本</summary><p id="actual-scope" class="hint"></p><pre id="versions"></pre></details>
+  <div id="error" class="error" role="alert" hidden></div>
+  <div class="index-heading"><p class="eyebrow">02 / ABSTRACTS</p><span id="candidate-count">0 篇</span></div>
+  <nav id="documents" aria-label="候选摘要列表"></nav>
+  <a id="export" class="export" hidden>导出本次证据报告 ↗</a>
+</aside>
+<section class="reading" aria-label="文献与原句阅读区">
+  <div class="reading-bar"><span id="reading-label">逐文献阅读</span><span id="scope">英文 · 摘要级</span></div>
+  <div id="empty" class="empty"><span class="folio">[  ]</span><h2>让结论对应到原句</h2><p>输入主张并检索摘要。选择一篇文献后，<br>可在原句编号旁核对证据与判断。</p></div>
+  <article id="article" hidden><div class="document-meta"><span id="document-id"></span><span id="rank"></span></div>
+  <h2 id="title"></h2><div id="relation" class="relation" hidden></div><p id="review-reason" class="hint" hidden></p>
+  <ol id="sentences" class="sentences"></ol><details id="raw-detail" hidden><summary>查看原始输出与版本</summary><pre id="raw"></pre></details></article>
+  <footer>NOINFO 表示当前摘要信息不足。不同文献分别判断，系统不以多数票裁定主张真伪。</footer>
+</section>
+</main></body></html>

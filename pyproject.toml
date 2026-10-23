@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "scifact-evidence-rag"
+version = "0.1.0"
+description = "SelfRAG scientific claim verification with traceable evidence and controlled training"
+requires-python = ">=3.12"
+license = {text = "MIT"}
+dependencies = ["numpy>=1.26,<3", "torch>=2.6,<3", "transformers==4.48.3", "peft==0.14.0",
+                "accelerate>=1,<2", "faiss-cpu>=1.9,<2", "fastapi>=0.115,<1", "uvicorn>=0.30,<1",
+                "pydantic>=2.9,<3", "PyYAML>=6,<7", "sentencepiece", "protobuf"]
+
+[project.optional-dependencies]
+test = ["pytest>=8,<10", "httpx>=0.27,<1"]
+nf4 = ["bitsandbytes>=0.45"]
+
+[project.scripts]
+evidence-rag = "evidence_rag.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["evidence_rag*"]
+
+[tool.setuptools.package-data]
+evidence_rag = ["web/*.html", "web/*.css", "web/*.js"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

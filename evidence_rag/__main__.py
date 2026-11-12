@@ -13,6 +13,7 @@ from .model import MODEL_ID, MODEL_REVISION, SelfRagVerifier, cold_reload_check,
 from .pipeline import Engine, predict_view
 from .protocol import calibrate, freeze_files, require_bindings, require_final, select_checkpoint, verify_frozen
 from .retrieval import ContrieverEncoder, ExactIndex
+from .fourbit import apply_adapter_override, audit_lengths, load_tokenizer, reset_peak_memory, run_experiment
 from .training import prepare_training, train_lora, validate_same_exposure
 from .views import apply_reviews, full_view, load_views, prepare_evaluation, propose_views
 from .workflow import checkpoint_evaluation, run_retrieved, validate_cache, verify_receipt, write_receipt
@@ -78,7 +79,9 @@ def main():
     p = sub.add_parser("model-contract"); p.add_argument("--config", required=True); p.add_argument("--output", required=True)
     p = sub.add_parser("fetch-model"); p.add_argument("--cache", required=True); p.add_argument("--include-weights", action="store_true")
     p = sub.add_parser("cold-reload"); p.add_argument("--config", required=True); p.add_argument("--probe", required=True); p.add_argument("--output", required=True)
-    p = sub.add_parser("train"); p.add_argument("--config", required=True); p.add_argument("--views", required=True); p.add_argument("--output", required=True)
+    p = sub.add_parser("train"); p.add_argument("--config", required=True); p.add_argument("--views", required=True); p.add_argument("--output", required=True); p.add_argument("--limit", type=int)
+    p = sub.add_parser("audit-lengths"); p.add_argument("--views", required=True); p.add_argument("--max-length", type=int, required=True); p.add_argument("--cache"); p.add_argument("--output", required=True); p.add_argument("--allow-download", action="store_true")
+    p = sub.add_parser("experiment"); p.add_argument("--group", choices=("B0", "B1"), required=True); p.add_argument("--config", required=True); p.add_argument("--data", required=True); p.add_argument("--split", choices=("train", "dev"), required=True); p.add_argument("--hits"); p.add_argument("--cited", action="store_true"); p.add_argument("--output", required=True); p.add_argument("--limit", type=int); p.add_argument("--adapter"); p.add_argument("--views"); p.add_argument("--quadruples"); p.add_argument("--splits"); p.add_argument("--partition"); p.add_argument("--frozen-manifest")
     p = sub.add_parser("prepare-training"); p.add_argument("--views", required=True); p.add_argument("--run", choices=("B1", "B2", "B3"), required=True); p.add_argument("--output", required=True); p.add_argument("--audit", required=True)
     p = sub.add_parser("compare-exposure"); p.add_argument("--b2", required=True); p.add_argument("--b3", required=True)
     p = sub.add_parser("predict-views"); p.add_argument("--views", required=True); p.add_argument("--config", required=True); p.add_argument("--output", required=True); p.add_argument("--frozen-manifest"); p.add_argument("--data"); p.add_argument("--splits")
@@ -170,7 +173,23 @@ def main():
     elif action == "cold-reload":
         value = cold_reload_check(verifier_from_config(args.config), args.probe, args.output)
     elif action == "train":
-        value = train_lora(config(args.config), args.views, args.output)
+        value = train_lora(config(args.config), args.views, args.output, limit=args.limit)
+    elif action == "audit-lengths":
+        report = audit_lengths(load_views(args.views), load_tokenizer(args.cache, local_files_only=not args.allow_download), args.max_length)
+        write_json(args.output, report)
+        value = {"n": report["n"], "overlong": len(report["overlong"]), "longest": report["longest"], "output": args.output}
+    elif action == "experiment":
+        data = Dataset(args.data)
+        claims = select_claims(data, args.split, args.partition, args.splits)
+        hits = read_json(args.hits) if args.hits else None
+        settings = apply_adapter_override(config(args.config), args.adapter, args.group)
+        reset_peak_memory()
+        verifier = verifier_from_settings(settings)
+        value = run_experiment(data, claims, verifier, args.output, group=args.group, config=settings,
+                               hits=hits, cited=args.cited, limit=args.limit,
+                               views=load_views(args.views) if args.views else None,
+                               quadruples=read_json(args.quadruples) if args.quadruples else None,
+                               frozen_manifest=args.frozen_manifest)
     elif action == "prepare-training":
         value = prepare_training(args.views, args.run, args.output, args.audit)
     elif action == "compare-exposure":

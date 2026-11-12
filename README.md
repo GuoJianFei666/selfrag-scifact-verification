@@ -11,10 +11,10 @@
 |项目|实际结果|
 |---|---|
 |公开源码|数据、检索、模型接口、LoRA训练、评测、API和网页|
-|工程测试|51项通过，含微型随机Llama的B1/B2/B3训练、保存和冷重载|
+|工程测试|62项通过，含微型随机Llama的B1/B2/B3训练、保存和冷重载，以及8GB四比特配置的CPU测试|
 |真实检索|5183篇摘要，固定Contriever与768维FAISS精确索引|
 |train top-5检索诊断|gold文档召回486/564，即86.17%；至少命中一篇451/505，即89.31%|
-|发布SelfRAG 7B|尚未加载权重；未运行正式领域训练或性能对照|
+|发布SelfRAG 7B|尚未加载权重；未运行正式领域训练或性能对照。B0/B1 在 8GB 卡上改为同一套 NF4，命令见[8GB 实验](docs/experiments-8gb.md)，尚无实测成绩|
 |来源分组|train对齐529/809；其余280条保留，完整来源划分未生成|
 
 工程测试验证代码，检索诊断使用训练集。两者均不代表7B模型的关系判断成绩。详细记录见[验证说明](docs/VALIDATION.md)。
@@ -32,7 +32,7 @@ python -m venv .venv
 & '.venv/Scripts/python.exe' -m pytest -q
 ```
 
-`requirements-lock-cpu.txt`记录本次本机环境。GPU运行需要安装与设备匹配的PyTorch/CUDA；NF4为可选入口，本次未验证其CUDA兼容性。依赖安装不下载7B模型权重。
+`requirements-lock-cpu.txt`记录此前的 CPU 环境。RTX 5060 只有 8GB 显存，FP16 的 7B 放不下，所以 B0/B1 的主线改为同一套 NF4（B0 直接推理，B1 为 QLoRA，只存 adapter）。原生 Windows 可以跑，不需要 WSL2。安装和冒烟、全量命令见[8GB 实验](docs/experiments-8gb.md)。上面的 CPU 安装只用于测试，不要拿它在这张卡上加载 7B。依赖安装不下载 7B 权重。
 
 ## 运行真实检索界面
 
@@ -79,7 +79,7 @@ B1使用原始领域SFT；B2加入已复核干预；B3在同一SFT序列上增�
 |`evidence_rag/data.py`、`views.py`|原始数据、来源审计、替代证据视图、两轮复核|
 |`evidence_rag/retrieval.py`|固定编码器、精确索引、真实检索缓存|
 |`evidence_rag/serialization.py`、`model.py`|目标mask、完整标签概率、结构化生成和模型合约|
-|`evidence_rag/training.py`|LoRA、配对损失、检查点、预算和重载|
+|`evidence_rag/training.py`、`fourbit.py`|LoRA / QLoRA、配对损失、检查点、预算和重载；B0/B1 的 4-bit 评测|
 |`evidence_rag/evaluation.py`、`protocol.py`、`workflow.py`|官方指标、联合诊断、校准和冻结输入|
 |`evidence_rag/app.py`、`pipeline.py`、`web/`|FastAPI、来源绑定、报告和网页|
 |`tests/`、`.github/workflows/`|工程测试及CPU CI|

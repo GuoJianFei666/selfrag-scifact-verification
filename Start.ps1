@@ -1,4 +1,4 @@
-param([switch]$WithModel, [int]$Port = 8787)
+param([switch]$WithModel, [int]$Port = 8787, [string]$ModelConfig = 'configs/model.yaml')
 $ErrorActionPreference = 'Stop'
 $projectRoot = $PSScriptRoot
 $pythonPath = Join-Path $projectRoot '.venv/Scripts/python.exe'
@@ -14,7 +14,7 @@ try {
     $serverArguments = @('-m', 'evidence_rag', 'serve', '--data', 'var/scifact',
         '--index', 'var/contriever-index', '--cache', 'var/model-cache',
         '--reports', 'var/reports', '--port', $Port)
-    if ($WithModel) { $serverArguments += @('--config', 'configs/model.yaml') }
+    if ($WithModel) { $serverArguments += @('--config', $ModelConfig) }
     & $pythonPath @serverArguments
     exit $LASTEXITCODE
 } finally { Pop-Location }

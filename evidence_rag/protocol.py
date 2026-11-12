@@ -59,6 +59,8 @@ def require_final(path, dataset, splits, config=None, hits=None, prediction=None
         if selection["selected_on"] != "model_select" or Path(selection["selected"]["path"]).resolve() != adapter.resolve():
             raise ValueError("Final adapter differs from model_select choice")
         adapter_manifest = read_json(adapter / "run_manifest.json")
+        if adapter_manifest.get("smoke_limit"):
+            raise ValueError("Smoke adapter cannot be a final checkpoint")
         if adapter_manifest["run"] != record["parameters"]["baseline"] or selection["selected"]["baseline"] != adapter_manifest["run"] or selection["selected"]["checkpoint_manifest_sha256"] != file_hash(adapter / "run_manifest.json"):
             raise ValueError("Adapter baseline or selected weight record changed")
         if adapter_manifest["run"] == "B3":

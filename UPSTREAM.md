@@ -9,6 +9,8 @@
 
 应用、数据校验、视图构造、训练循环、候选关系评分、结果绑定及网页均为本轮独立实现。官方评测公式按固定上游实现重新编写，并使用手工计数算例校验；未运行旧项目代码。该应用不是完整上游自适应检索流程，也未重现 Self-RAG 论文的全部实验。
 
+8GB 显存下的 B0/B1 使用 NF4。这是本仓库为这张卡增加的加载方式，不是上面三个固定版本的内容；版本号保持不变。
+
 SciFact 数据来自 [官方原始包](https://scifact.s3.us-west-2.amazonaws.com/release/latest/data.tar.gz)，SHA256 为 `11c621288d41ac144d29b13b0f8503b3820b7d6e8b1f6ff24dff335c196d76be`。来源主张文件来自 [claims_with_citances.jsonl](https://scifact.s3.us-west-2.amazonaws.com/release/latest/claims_with_citances.jsonl)，SHA256 为 `a12af8640b5079dc6ceccbf1a31e755b28158643ddd1928f91b92caa0c388704`。文件结构见 [来源说明](https://github.com/allenai/scifact/blob/68b98a56d93e0f9da0d2aab4e6c3294699a0f72e/doc/claims-with-citances.md)。
 
 使用数据时保留 SciFact 的 [分项许可](https://github.com/allenai/scifact/blob/68b98a56d93e0f9da0d2aab4e6c3294699a0f72e/LICENSE.md)。Self-RAG 代码、Contriever 和 Llama2 衍生模型有各自许可；下载或分发模型前请阅读固定发布页中的许可及基础模型要求。新增代码的 MIT 不替代数据或权重许可。源码交付包不含上游模型权重、完整数据或旧项目源码。

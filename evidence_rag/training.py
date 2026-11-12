@@ -7,7 +7,8 @@ import random
 import time
 
 from .common import digest, file_hash, read_json, utcnow, write_json, write_jsonl
-from .model import MODEL_ID, MODEL_REVISION, load_release
+from .fourbit import build_optimizer, cuda_memory_snapshot
+from .model import load_release
 from .data import validate_split
 from .serialization import TEMPLATE_VERSION, collate, encode_supervised, relation_candidates, relation_scores
 from .views import load_views, validate_intervention
@@ -111,15 +112,40 @@ def validate_same_exposure(first, second):
         raise ValueError("B2/B3 exposure or initialization differs: " + ", ".join(differences))
 
 
-def train_lora(config, views_path, output, resume_adapter=None):
+def assert_adapter_only(directory):
+    forbidden = ("pytorch_model.bin", "model.safetensors", "model.safetensors.index.json", "pytorch_model.bin.index.json")
+    found = [name for name in forbidden if (Path(directory) / name).exists()]
+    if found:
+        raise RuntimeError("Refusing to keep merged full weights: " + ", ".join(found))
+
+
+def enable_checkpointing(model):
+    model.config.use_cache = False
+    model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
+    if hasattr(model, "enable_input_require_grads"):
+        model.enable_input_require_grads()
+    return model
+
+
+def train_lora(config, views_path, output, resume_adapter=None, *, limit=None):
     import torch
     from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
     defaults = {"seed": 42, "gradient_accumulation": 16, "precision": "float32", "quantization": "none",
                 "lora": {"r": 16, "lora_alpha": 32, "lora_dropout": 0.05, "target_modules": ["q_proj", "v_proj"]},
-                "max_length": 2048, "margin": 1.0, "lambda_dir": 0.1, "lambda_keep": 0.1, "device": "cpu"}
+                "max_length": 2048, "margin": 1.0, "lambda_dir": 0.1, "lambda_keep": 0.1, "device": "cpu",
+                "gradient_checkpointing": False, "optimizer": "adamw", "save_adapter_only": True, "merge_adapter": False}
     config = {**defaults, **config}
+    if config.get("merge_adapter") or config.get("save_adapter_only") is False:
+        raise ValueError("Refusing to merge LoRA into the base model")
     if config["precision"] not in ("float32", "float16", "bfloat16"):
         raise ValueError("Unsupported training precision")
+    if config.get("quantization") == "nf4":
+        if config["precision"] == "float32":
+            raise ValueError("NF4 compute dtype must be float16 or bfloat16")
+        if config.get("bnb_4bit_quant_type", "nf4") != "nf4" or config.get("bnb_4bit_use_double_quant", True) is not True:
+            raise ValueError("8GB path requires nf4 with double quantization")
+        if not config.get("gradient_checkpointing"):
+            raise ValueError("NF4 QLoRA requires gradient checkpointing")
     if not 0 < config["learning_rate"] <= 0.1 or config["lambda_dir"] < 0 or config["lambda_keep"] < 0:
         raise ValueError("Invalid optimizer or pair-loss weights")
     if not config.get("split_manifest"):
@@ -139,6 +165,15 @@ def train_lora(config, views_path, output, resume_adapter=None):
     random.seed(seed)
     torch.manual_seed(seed)
     views = load_views(views_path)
+    if limit is not None:
+        if config["run"] != "B1":
+            raise ValueError("Smoke limit is only for a B1 setup check")
+        if type(limit) is not int or limit < 1:
+            raise ValueError("Smoke limit must be a positive integer")
+        ordered = sorted(views, key=lambda view: view.view_id)
+        if limit > len(ordered):
+            raise ValueError("Smoke limit exceeds the available training views")
+        views = ordered[:limit]
     if config.get("split_manifest"):
         if any(split_manifest["assignments"].get(str(v.claim_id)) != "fit" or split_manifest["groups"].get(str(v.claim_id)) != v.source_group for v in views):
             raise ValueError("Training view split or source group differs from frozen split manifest")
@@ -160,10 +195,16 @@ def train_lora(config, views_path, output, resume_adapter=None):
     model, tokenizer, contract = load_release(config["device"], config["precision"], cache_dir=config.get("cache_dir"),
                                                local_files_only=config.get("local_files_only", True),
                                                quantization=config.get("quantization", "none"))
+    checkpointing = bool(config.get("gradient_checkpointing"))
     if config.get("quantization", "none") != "none":
-        model = prepare_model_for_kbit_training(model)
+        model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=checkpointing,
+                                                gradient_checkpointing_kwargs={"use_reentrant": False} if checkpointing else None)
+    elif checkpointing:
+        enable_checkpointing(model)
     lora = config.get("lora", {"r": 16, "lora_alpha": 32, "lora_dropout": 0.05, "target_modules": ["q_proj", "v_proj"]})
     model = get_peft_model(model, LoraConfig(**lora, task_type="CAUSAL_LM", bias="none"))
+    if checkpointing and not model.get_base_model().is_gradient_checkpointing:
+        raise RuntimeError("Gradient checkpointing was requested but is not active")
     encoded = {vid: encode_supervised(view, tokenizer, config["max_length"]) for vid, view in by_id.items()}
     accumulation = config.get("gradient_accumulation", 16)
     if type(accumulation) is not int or accumulation < 1:
@@ -172,7 +213,7 @@ def train_lora(config, views_path, output, resume_adapter=None):
     if not trainable or any("lora_" not in name for name in trainable):
         raise ValueError("Only LoRA parameters may be trainable")
     before = {name: p.detach().cpu().clone() for name, p in trainable.items()}
-    optimizer = torch.optim.AdamW(trainable.values(), lr=config["learning_rate"])
+    optimizer = build_optimizer(config.get("optimizer", "adamw"), list(trainable.values()), config["learning_rate"])
     model.train()
     model.config.use_cache = False
     output.mkdir(parents=True, exist_ok=True)
@@ -228,6 +269,7 @@ def train_lora(config, views_path, output, resume_adapter=None):
             checkpoint = output / f"checkpoint-epoch-{epoch}"
             model.save_pretrained(checkpoint, safe_serialization=True)
             tokenizer.save_pretrained(checkpoint)
+            assert_adapter_only(checkpoint)
             model.eval()
             probe_ids = torch.tensor([encoded[sequence[0]]["input_ids"]], device=device)
             with torch.inference_mode():
@@ -247,6 +289,7 @@ def train_lora(config, views_path, output, resume_adapter=None):
         raise ValueError("No adapter parameter changed")
     model.save_pretrained(output, safe_serialization=True)
     tokenizer.save_pretrained(output)
+    assert_adapter_only(output)
     record = {"created_at": utcnow(), "run": config["run"], "model_id": contract["model_id"], "model_revision": contract["revision"],
               "template_version": TEMPLATE_VERSION, "contract": contract, "training_views_sha256": file_hash(views_path),
               "sft_sequence_sha256": digest(sequence), "supervised_tokens": tokens, "optimizer_steps": steps,
@@ -255,8 +298,10 @@ def train_lora(config, views_path, output, resume_adapter=None):
               "forward_calls": forwards, "elapsed_seconds": time.monotonic() - start,
               "validation_forward_calls": len(checkpoint_records) + 2,
               "changed_adapter_parameters": changed, "trainable_parameter_names": sorted(trainable),
+              "gradient_checkpointing": checkpointing, "smoke_limit": limit, "save_adapter_only": True,
+              "peak_vram": cuda_memory_snapshot(),
               "config": config, **{key: config.get(key, "none") for key in
-                                  ("seed", "learning_rate", "gradient_accumulation", "epochs", "lora", "precision", "quantization")}}
+                                  ("seed", "learning_rate", "gradient_accumulation", "epochs", "lora", "precision", "quantization", "optimizer")}}
     record["tokenizer_sha256"] = digest({"vocabulary": tokenizer.get_vocab(), "special_tokens": tokenizer.special_tokens_map})
     record["checkpoints"] = checkpoint_records
     for checkpoint in checkpoint_records:

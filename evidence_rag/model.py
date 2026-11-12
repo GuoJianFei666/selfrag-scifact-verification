@@ -36,21 +36,24 @@ def validate_contract(model, tokenizer):
 
 def load_release(device="cpu", precision="float32", adapter=None, cache_dir=None, local_files_only=False, quantization="none"):
     import torch
-    from transformers import AutoModelForCausalLM, AutoTokenizer
     if precision not in ("float32", "bfloat16", "float16"):
         raise ValueError("Unsupported precision")
+    if quantization not in ("none", "nf4"):
+        raise ValueError("quantization must be none or nf4")
+    if quantization == "nf4":
+        from .fourbit import nf4_options
+        nf4_options(precision)
+        if not str(device).startswith("cuda") or not torch.cuda.is_available():
+            raise ValueError("NF4 requires a CUDA device and a bitsandbytes build with matching kernels")
+    from transformers import AutoModelForCausalLM, AutoTokenizer
     tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, revision=MODEL_REVISION, use_fast=True,
                                               cache_dir=cache_dir, local_files_only=local_files_only)
     extra = {}
     if quantization == "nf4":
         from transformers import BitsAndBytesConfig
-        if not device.startswith("cuda") or not torch.cuda.is_available():
-            raise ValueError("NF4 training requires a supported CUDA/bitsandbytes environment")
         extra = {"quantization_config": BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4",
                  bnb_4bit_use_double_quant=True, bnb_4bit_compute_dtype=getattr(torch, precision)),
-                 "device_map": {"": device}}
-    elif quantization != "none":
-        raise ValueError("quantization must be none or nf4")
+                 "device_map": {"": device}, "low_cpu_mem_usage": True}
     model = AutoModelForCausalLM.from_pretrained(MODEL_ID, revision=MODEL_REVISION,
                                                 torch_dtype=getattr(torch, precision), cache_dir=cache_dir,
                                                 local_files_only=local_files_only, trust_remote_code=False, **extra)

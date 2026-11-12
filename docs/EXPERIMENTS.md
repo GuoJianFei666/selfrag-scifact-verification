@@ -2,6 +2,8 @@
 
 以下命令对应已经实现的入口。当前完整来源映射和 SelfRAG 7B 权重未准备好，尚未运行正式领域训练。不要把命令示例当作实验结果。
 
+RTX 5060（8GB）上的 B0/B1 主线是 4-bit，不是 FP16。安装、冒烟和全量命令见 [8GB 实验](experiments-8gb.md)。`configs/B1.yaml` 仍是全精度参考，这张卡放不下。
+
 所有相对路径均以项目根目录为工作目录。先运行 `python -m evidence_rag --help` 查看参数。本文为节省重复，将实际解释器记作 `$pythonPath`：
 
 ```powershell

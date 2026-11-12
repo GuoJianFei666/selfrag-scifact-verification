@@ -52,6 +52,13 @@
       "revision": "2cfc18c9415c912f9d8155881c133215df768a70",
       "max_length": 512,
       "candidates": 50
+    },
+    "finetuned_embedding": {
+      "model_id": "BAAI/bge-small-en-v1.5",
+      "revision": "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a",
+      "weights": "local fine-tune, not committed",
+      "pooling": "cls",
+      "normalize": true
     }
   },
   "metric_notes": [
@@ -322,6 +329,165 @@
       "similarity": "COSINE",
       "index_type": "FLAT",
       "notes": "Adjacent sentences stay together while cosine similarity is at least 0.5 and the chunk has at most 3 sentences."
+    },
+    {
+      "id": "bge_finetuned_whole",
+      "label": "bge-small-en-v1.5 finetuned / Milvus whole abstract",
+      "status": "measured",
+      "group": "finetune",
+      "chunking": "whole_abstract",
+      "requires_llm": false,
+      "recall": {
+        "1": 0.7655141843971631,
+        "3": 0.8931737588652482,
+        "5": 0.9359042553191489,
+        "10": 0.9712765957446808,
+        "20": 0.9739361702127659
+      },
+      "mrr_at_10": 0.8553191489361702,
+      "ndcg_at_10": 0.882395997553674,
+      "latency_seconds": {
+        "mean": 0.23116186676993797,
+        "median": 0.22590075449988944,
+        "n": 300
+      },
+      "eligible_claims": 188,
+      "gold_documents": 209,
+      "queries_timed": 300,
+      "warmup_queries_excluded": 1,
+      "framework": "llamaindex+milvus",
+      "vector_store": "milvus-lite",
+      "embedding_model": "BAAI/bge-small-en-v1.5",
+      "embedding_revision": "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a",
+      "reranker": null,
+      "query_transform": null,
+      "candidate_k": 20,
+      "chunk_search_k": 20,
+      "index_chunks": 5183,
+      "model_load_seconds": 2.5888317589997314,
+      "index_build_seconds": 278.83177513900046,
+      "milvus_mode": "lite",
+      "similarity": "COSINE",
+      "index_type": "FLAT",
+      "notes": "Whole-abstract vectors from the SciFact-train fine-tune of bge-small-en-v1.5. Dev was not used for training or checkpoint selection.",
+      "encoder_weights": "finetuned",
+      "finetuned_checkpoint": "var/retrieval-runs/finetuned-bge"
+    },
+    {
+      "id": "bge_finetuned_sliding",
+      "label": "bge-small-en-v1.5 finetuned / sliding window (2, stride 1)",
+      "status": "measured",
+      "group": "finetune",
+      "chunking": "sliding",
+      "requires_llm": false,
+      "recall": {
+        "1": 0.8000886524822695,
+        "3": 0.902482269503546,
+        "5": 0.949468085106383,
+        "10": 0.975531914893617,
+        "20": 0.9914893617021276
+      },
+      "mrr_at_10": 0.8793587470449173,
+      "ndcg_at_10": 0.901750481328842,
+      "latency_seconds": {
+        "mean": 1.4930692425633425,
+        "median": 1.444777964999048,
+        "n": 300
+      },
+      "eligible_claims": 188,
+      "gold_documents": 209,
+      "queries_timed": 300,
+      "warmup_queries_excluded": 1,
+      "framework": "llamaindex+milvus",
+      "vector_store": "milvus-lite",
+      "embedding_model": "BAAI/bge-small-en-v1.5",
+      "embedding_revision": "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a",
+      "reranker": null,
+      "query_transform": null,
+      "candidate_k": 20,
+      "chunk_search_k": 2000,
+      "index_chunks": 40769,
+      "model_load_seconds": null,
+      "index_build_seconds": 600.433293995,
+      "milvus_mode": "lite",
+      "similarity": "COSINE",
+      "index_type": "FLAT",
+      "notes": "Window 2, stride 1. Encoder weights are the SciFact-train fine-tune. Dev was not used for training or checkpoint selection.",
+      "encoder_weights": "finetuned",
+      "finetuned_checkpoint": "var/retrieval-runs/finetuned-bge"
     }
-  ]
+  ],
+  "finetune": {
+    "status": "completed",
+    "started_at": "2026-11-12T10:06:33+00:00",
+    "base_model_id": "BAAI/bge-small-en-v1.5",
+    "base_revision": "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a",
+    "seed": 42,
+    "epochs": 2,
+    "batch_size": 16,
+    "learning_rate": 2e-05,
+    "warmup_ratio": 0.1,
+    "weight_decay": 0.01,
+    "max_length": 512,
+    "loss": "MultipleNegativesRankingLoss",
+    "loss_scale": 20.0,
+    "hard_negatives_per_example": 1,
+    "hard_negative_source": "baseline bge-small whole-abstract cosine, gold evidence documents removed, then one lexical sliding window",
+    "positive": "one sliding window (window 2, stride 1) per gold document, maximum rationale overlap",
+    "query_prefix_on_anchor": true,
+    "monitor_fraction": 0.1,
+    "monitor_selection": "seeded shuffle of eligible train claim ids; int(n * fraction), at least 1 and at most n-1",
+    "train_claims": 809,
+    "eligible_train_claims": 505,
+    "fit_claims": 455,
+    "monitor_claims": 50,
+    "fit_examples": 509,
+    "monitor_examples": 55,
+    "unique_train_gold_documents": 365,
+    "dev_gold_documents_counted_for_overlap_only": 182,
+    "train_dev_gold_document_overlap": 110,
+    "model_load_seconds": 1.8025504939996608,
+    "mine_seconds": 195.91639726600079,
+    "train_seconds": 129.07968701799837,
+    "epoch_train_loss_mean": [
+      0.6566819044597009,
+      0.40557512531385703
+    ],
+    "optimizer_steps": 68,
+    "loss_before": {
+      "fit": 0.8835648270744706,
+      "monitor": 0.7372029922225258
+    },
+    "loss_after": {
+      "fit": 0.4519420824432654,
+      "monitor": 0.4111101573163813
+    },
+    "loss_mode": "eval-mode MultipleNegativesRankingLoss, dropout off, same pairs before and after the update",
+    "hardware": {
+      "platform": "Linux 6.12.113+",
+      "cpu_model": "Intel(R) Xeon(R) Processor",
+      "cpu_cores": 4,
+      "ram_gib": 15.63,
+      "gpu": "none",
+      "omp_num_threads": "4",
+      "mkl_num_threads": "4",
+      "torch_threads": 4
+    },
+    "model_dir": "var/retrieval-runs/finetuned-bge",
+    "weights_committed": false,
+    "dev_used_for_training": false,
+    "dev_used_for_selection": false,
+    "reranker": {
+      "status": "skipped",
+      "model_id": "BAAI/bge-reranker-base",
+      "revision": "2cfc18c9415c912f9d8155881c133215df768a70",
+      "reason": "Only the bi-encoder was fine-tuned. One AdamW step on 8 synthetic pairs was timed and discarded.",
+      "probe_batch_size": 8,
+      "probe_step_seconds": 3.8080963310003426,
+      "probe_loss": 2.5887084007263184,
+      "probe_texts": "synthetic"
+    },
+    "finished_at": "2026-11-12T10:12:40+00:00"
+  },
+  "finetune_evaluated_at": "2026-11-12T10:36:04+00:00"
 }

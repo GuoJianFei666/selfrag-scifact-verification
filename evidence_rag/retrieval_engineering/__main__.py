@@ -10,10 +10,12 @@ os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")
 import argparse
 import logging
 
-from ..common import utcnow
+from ..common import read_json, utcnow, write_json
 from .config import load_config
+from .finetune import run_finetune
 from .llm import gated_transform, llm_settings
 from .plan import EXPERIMENTS
+from .report import merge_dev_report
 from .run import Comparison, publish
 
 CHUNKINGS = {
@@ -46,9 +48,27 @@ def main(argv=None):
     chunking = sub.add_parser("chunking", parents=[common], help="(e) whole, sentence, sliding, and semantic chunks")
     chunking.add_argument("--variants", default="whole,sentence,sliding,semantic")
     sub.add_parser("compare", parents=[common], help="Run (a), (b), (c) and (e). Record (d) as not yet run.")
+    finetune = sub.add_parser("finetune", parents=[common], help="Fine-tune bge-small on SciFact train")
+    finetune.add_argument("--model-dir", default="var/retrieval-runs/finetuned-bge")
+    evaluated = sub.add_parser("eval-finetuned", parents=[common], help="Score the fine-tuned encoder on SciFact dev")
+    evaluated.add_argument("--model", required=True)
+    evaluated.add_argument("--record", required=True)
+    evaluated.add_argument("--results", default="results/retrieval-dev.json")
     # compare can run without --data being forgotten; it is required by the parent.
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    if args.command == "finetune":
+        if args.split != "train":
+            raise ValueError("finetune only reads the train split; pass --split train")
+        record = run_finetune(args.data, load_config(args.config), args.cache, args.model_dir)
+        output = args.output or "var/retrieval-runs/finetune-record.json"
+        write_json(output, record)
+        logging.info("wrote %s", output)
+        return record
+    if args.command == "eval-finetuned":
+        if args.split != "dev":
+            raise ValueError("eval-finetuned scores the dev split")
+        return _eval_finetuned(args)
     if args.command == "rewrite":
         report = _rewrite(args)
     else:
@@ -63,6 +83,19 @@ def main(argv=None):
     publish(report, output, markdown)
     logging.info("wrote %s", output)
     return report
+
+
+def _eval_finetuned(args):
+    comparison = Comparison(args.data, args.config, args.cache, args.work, "dev", True)
+    rows = comparison.eval_finetuned(args.model)
+    existing_path = args.output or args.results
+    merged = merge_dev_report(read_json(existing_path), rows, read_json(args.record), utcnow())
+    markdown = args.markdown
+    if markdown is None and existing_path == "results/retrieval-dev.json":
+        markdown = "results/retrieval-dev.md"
+    publish(merged, existing_path, markdown)
+    logging.info("wrote %s", existing_path)
+    return merged
 
 
 def _run(comparison, args):

@@ -32,4 +32,34 @@ def load_config(path):
     prefix = value["embedding"].get("query_prefix", "")
     if not isinstance(prefix, str) or prefix and not prefix.endswith(" "):
         raise ValueError("BGE query prefix must be empty or end with a space")
+    _validate_finetune(value.get("finetune"))
     return value
+
+
+def _validate_finetune(spec):
+    if spec is None:
+        return
+    if not isinstance(spec, dict):
+        raise ValueError("finetune config must be an object")
+    epochs = spec.get("epochs")
+    if type(epochs) is not int or not 1 <= epochs <= 3:
+        raise ValueError("finetune.epochs must be an integer from 1 to 3")
+    if type(spec.get("batch_size")) is not int or spec["batch_size"] < 2:
+        raise ValueError("finetune.batch_size must be an integer of at least 2")
+    if type(spec.get("seed")) is not int:
+        raise ValueError("finetune.seed must be an integer")
+    if spec.get("hard_negatives") != 1:
+        raise ValueError("finetune.hard_negatives must be 1")
+    if spec.get("loss") != "MultipleNegativesRankingLoss":
+        raise ValueError("finetune.loss must be MultipleNegativesRankingLoss")
+    if spec.get("reranker") != "skip":
+        raise ValueError("finetune.reranker must be skip")
+    fraction = spec.get("monitor_fraction")
+    if isinstance(fraction, bool) or not isinstance(fraction, (int, float)) or not 0 < float(fraction) < 0.5:
+        raise ValueError("finetune.monitor_fraction must be between 0 and 0.5")
+    for key in ("learning_rate", "warmup_ratio", "weight_decay", "loss_scale"):
+        value = spec.get(key)
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or float(value) < 0:
+            raise ValueError(f"finetune.{key} must be a non-negative number")
+    if type(spec.get("max_length")) is not int or spec["max_length"] < 8:
+        raise ValueError("finetune.max_length must be an integer of at least 8")

@@ -21,6 +21,14 @@ EXPERIMENTS = (
 )
 
 
+FINETUNE_EXPERIMENTS = (
+    {"id": "bge_finetuned_whole", "label": "bge-small-en-v1.5 finetuned / Milvus whole abstract", "group": "finetune",
+     "chunking": "whole_abstract", "requires_llm": False},
+    {"id": "bge_finetuned_sliding", "label": "bge-small-en-v1.5 finetuned / sliding window (2, stride 1)", "group": "finetune",
+     "chunking": "sliding", "requires_llm": False},
+)
+
+
 def comparison_rows(include_llm=False):
     rows = []
     for spec in EXPERIMENTS:

@@ -13,7 +13,7 @@ from .config import load_config, milvus_mode
 from .llm import gated_transform, hyde_passage, llm_settings, rewrite_query
 from .metrics import score_claims
 from .models import ensure_snapshot, load_bge, load_reranker
-from .plan import EXPERIMENTS, comparison_rows
+from .plan import EXPERIMENTS, FINETUNE_EXPERIMENTS, comparison_rows
 from .report import render_markdown
 from .rerank import order_by_scores
 
@@ -160,6 +160,8 @@ class Comparison:
         self.ks = tuple(int(value) for value in self.cfg["evaluation"]["ks"])
         self.checkpoint_path = self.work / "checkpoint.json"
         self.done = _read_checkpoint(self.checkpoint_path) if resume else {}
+        self.collection_prefix = "scifact"
+        self.embedding_path = None
         self._expect_counts()
 
     def baseline(self):
@@ -174,6 +176,29 @@ class Comparison:
 
     def chunking(self, kinds=("whole_abstract", "sentence", "sliding", "semantic")):
         return [self.bge(kind) for kind in kinds]
+
+    def eval_finetuned(self, model_dir):
+        path = Path(model_dir)
+        if not (path / "modules.json").exists():
+            raise FileNotFoundError(f"Fine-tuned SentenceTransformer is missing modules.json: {path}")
+        self.embedding_path = str(path)
+        self.collection_prefix = "scifact_ft"
+        self._embedder_state = None
+        window = self.cfg["chunking"]["sliding_window"]
+        stride = self.cfg["chunking"]["sliding_stride"]
+        whole = self._cached("bge_finetuned_whole", lambda: self._bge(
+            "whole_abstract", "bge_finetuned_whole",
+            note="Whole-abstract vectors from the SciFact-train fine-tune of bge-small-en-v1.5. Dev was not used for training or checkpoint selection.",
+        ))
+        sliding = self._cached("bge_finetuned_sliding", lambda: self._bge(
+            "sliding", "bge_finetuned_sliding",
+            note=(
+                f"Window {window}, stride {stride}. Encoder weights are the SciFact-train fine-tune. "
+                "Dev was not used for training or checkpoint selection."
+            ),
+        ))
+        self._drop_embedder()
+        return [whole, sliding]
 
     def rewrite(self, env=None):
         env = os.environ if env is None else env
@@ -283,7 +308,7 @@ class Comparison:
             "notes": "Frozen Contriever, attention-mask mean pooling, unnormalized inner product, exact FAISS.",
         })
 
-    def _bge(self, kind, experiment_id):
+    def _bge(self, kind, experiment_id, note=None):
         embedder, load_seconds = self._embedder()
         if getattr(self, "_bge_load_reported", False):
             load_seconds = None
@@ -316,7 +341,9 @@ class Comparison:
             "similarity": self.cfg["milvus"]["similarity"],
             "index_type": "FLAT",
             "chunking": kind,
-            "notes": _chunk_note(kind, self.cfg),
+            "notes": note or _chunk_note(kind, self.cfg),
+            "encoder_weights": "finetuned" if self.embedding_path else "pretrained",
+            "finetuned_checkpoint": self.embedding_path,
         })
 
     def _rerank(self):
@@ -427,10 +454,12 @@ class Comparison:
         if state is not None:
             return state
         spec = self.cfg["embedding"]
-        log.info("downloading %s if needed", spec["model_id"])
-        ensure_snapshot(spec["model_id"], spec["revision"], self.cache, BGE_IGNORE)
+        path = self.embedding_path
+        if not path:
+            log.info("downloading %s if needed", spec["model_id"])
+            ensure_snapshot(spec["model_id"], spec["revision"], self.cache, BGE_IGNORE)
         started = time.perf_counter()
-        embedder = load_bge(spec, self.cache, show_progress=False)
+        embedder = load_bge(spec, self.cache, show_progress=bool(path), model_path=path)
         self._embedder_state = (embedder, time.perf_counter() - started)
         return self._embedder_state
 
@@ -441,7 +470,7 @@ class Comparison:
     def _milvus(self, kind, embedder):
         from .stores import MilvusChunkIndex
         uri = self._store_uri(kind)
-        collection = _collection(kind)
+        collection = self._collection_name(kind)
         log.info("building %s (%s)", collection, kind)
         started = time.perf_counter()
         nodes = build_nodes(self.documents, kind, self.cfg, embedder)
@@ -455,7 +484,7 @@ class Comparison:
     def _open_milvus(self, kind, embedder):
         from .stores import MilvusChunkIndex
         return MilvusChunkIndex.open(
-            self._store_uri(kind), embedder, _collection(kind),
+            self._store_uri(kind), embedder, self._collection_name(kind),
             similarity=self.cfg["milvus"]["similarity"],
             token=self.cfg["milvus"].get("token") or "",
         )
@@ -473,14 +502,17 @@ class Comparison:
         from pymilvus import MilvusClient
         client = MilvusClient(uri=configured, token=self.cfg["milvus"].get("token") or "")
         try:
-            return _collection(kind) in set(client.list_collections())
+            return self._collection_name(kind) in set(client.list_collections())
         finally:
             client.close()
 
     def _db_path(self, kind):
         directory = Path(self.cfg["milvus"]["uri"]).parent
         directory.mkdir(parents=True, exist_ok=True)
-        return directory / f"{_collection(kind)}.db"
+        return directory / f"{self._collection_name(kind)}.db"
+
+    def _collection_name(self, kind):
+        return f"{self.collection_prefix}_{kind}"
 
     def _chunk_k(self, kind, depth):
         if kind == "whole_abstract":
@@ -572,12 +604,8 @@ def _chunk_experiment_id(kind):
     }[kind]
 
 
-def _collection(kind):
-    return "scifact_" + kind
-
-
 def _spec(experiment_id):
-    for spec in EXPERIMENTS:
+    for spec in (*EXPERIMENTS, *FINETUNE_EXPERIMENTS):
         if spec["id"] == experiment_id:
             return spec
     raise KeyError(experiment_id)

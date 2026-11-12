@@ -17,7 +17,7 @@
 |发布SelfRAG 7B|尚未加载权重；未运行正式领域训练或性能对照|
 |来源分组|train对齐529/809；其余280条保留，完整来源划分未生成|
 
-工程测试验证代码，检索诊断使用训练集。两者均不代表7B模型的关系判断成绩。SciFact dev 上的检索对照（Contriever/FAISS、BGE + Milvus、重排序和分块）见[检索工程](docs/retrieval-engineering.md)，实测数字只写在 `results/retrieval-dev.md`。详细记录见[验证说明](docs/VALIDATION.md)。
+工程测试验证代码，检索诊断使用训练集。两者均不代表7B模型的关系判断成绩。SciFact dev 上的检索对照（Contriever/FAISS、BGE + Milvus、重排序、分块，以及只用 train 微调的 bge-small）见[检索工程](docs/retrieval-engineering.md)，实测数字只写在 `results/retrieval-dev.md`。详细记录见[验证说明](docs/VALIDATION.md)。
 
 ## 安装与测试
 

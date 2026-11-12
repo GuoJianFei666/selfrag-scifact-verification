@@ -13,3 +13,5 @@ artifacts/
 data/raw/
 data/processed/
 *.db
+finetuned-bge/
+finetune-trainer/

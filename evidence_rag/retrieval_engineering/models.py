@@ -49,22 +49,30 @@ def ensure_snapshot(model_id, revision, cache, ignore_patterns=None):
     return snapshot_download(model_id, revision=revision, cache_dir=cache, ignore_patterns=ignore_patterns)
 
 
-def load_bge(spec, cache, show_progress=False):
-    from sentence_transformers import SentenceTransformer
-    model = SentenceTransformer(
-        spec["model_id"],
-        revision=spec["revision"],
-        cache_folder=cache,
-        device="cpu",
-        local_files_only=True,
-    )
-    model.prompts = {}
-    model.default_prompt_name = None
-    model.max_seq_length = int(spec["max_length"])
+def load_bge(spec, cache, show_progress=False, model_path=None):
+    model = load_sentence_transformer(spec, cache, model_path=model_path)
     dimension = int(model.get_sentence_embedding_dimension())
     if dimension != int(spec["dimension"]):
         raise ValueError(f"Embedding dimension {dimension} does not match config {spec['dimension']}")
     return BgeEmbedder(model, spec["query_prefix"], dimension, int(spec["batch_size"]), show_progress)
+
+
+def load_sentence_transformer(spec, cache, model_path=None):
+    from sentence_transformers import SentenceTransformer
+    if model_path:
+        model = SentenceTransformer(str(model_path), device="cpu", local_files_only=True)
+    else:
+        model = SentenceTransformer(
+            spec["model_id"],
+            revision=spec["revision"],
+            cache_folder=cache,
+            device="cpu",
+            local_files_only=True,
+        )
+    model.prompts = {}
+    model.default_prompt_name = None
+    model.max_seq_length = int(spec["max_length"])
+    return model
 
 
 def load_reranker(spec, cache):

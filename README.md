@@ -2,7 +2,7 @@
 
 检索一条英文科研主张的相关摘要，逐篇判断支持、反驳或信息不足，并将证据句映射回原始文献。网页保留原句编号、判断状态和模型版本，支持导出逐文献报告。
 
-**Python · PyTorch / Transformers · PEFT / LoRA · Contriever · FAISS · FastAPI · SciFact**
+**Python · PyTorch / Transformers · PEFT / LoRA · Contriever · FAISS · LlamaIndex · Milvus · BGE · FastAPI · SciFact**
 
 ![真实检索与原句阅读界面](docs/images/retrieval-preview.png)
 
@@ -17,7 +17,7 @@
 |发布SelfRAG 7B|尚未加载权重；未运行正式领域训练或性能对照|
 |来源分组|train对齐529/809；其余280条保留，完整来源划分未生成|
 
-工程测试验证代码，检索诊断使用训练集。两者均不代表7B模型的关系判断成绩。详细记录见[验证说明](docs/VALIDATION.md)。
+工程测试验证代码，检索诊断使用训练集。两者均不代表7B模型的关系判断成绩。SciFact dev 上的检索对照（Contriever/FAISS、BGE + Milvus、重排序和分块）见[检索工程](docs/retrieval-engineering.md)，实测数字只写在 `results/retrieval-dev.md`。详细记录见[验证说明](docs/VALIDATION.md)。
 
 ## 安装与测试
 
@@ -28,11 +28,11 @@ git clone https://github.com/GuoJianFei666/selfrag-scifact-verification.git
 cd selfrag-scifact-verification
 python -m venv .venv
 & '.venv/Scripts/python.exe' -m pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu
-& '.venv/Scripts/python.exe' -m pip install -e '.[test]'
+& '.venv/Scripts/python.exe' -m pip install -e '.[test,retrieval]'
 & '.venv/Scripts/python.exe' -m pytest -q
 ```
 
-`requirements-lock-cpu.txt`记录本次本机环境。GPU运行需要安装与设备匹配的PyTorch/CUDA；NF4为可选入口，本次未验证其CUDA兼容性。依赖安装不下载7B模型权重。
+`requirements-lock-cpu.txt`记录此前本机环境。`retrieval`额外安装 LlamaIndex、Milvus Lite 和 sentence-transformers，测试会用到，但不会下载模型权重。GPU运行需要安装与设备匹配的PyTorch/CUDA；NF4为可选入口，本次未验证其CUDA兼容性。
 
 ## 运行真实检索界面
 
@@ -78,6 +78,7 @@ B1使用原始领域SFT；B2加入已复核干预；B3在同一SFT序列上增�
 |---|---|
 |`evidence_rag/data.py`、`views.py`|原始数据、来源审计、替代证据视图、两轮复核|
 |`evidence_rag/retrieval.py`|固定编码器、精确索引、真实检索缓存|
+|`evidence_rag/retrieval_engineering/`|LlamaIndex + Milvus 检索对照、分块、重排序和指标|
 |`evidence_rag/serialization.py`、`model.py`|目标mask、完整标签概率、结构化生成和模型合约|
 |`evidence_rag/training.py`|LoRA、配对损失、检查点、预算和重载|
 |`evidence_rag/evaluation.py`、`protocol.py`、`workflow.py`|官方指标、联合诊断、校准和冻结输入|

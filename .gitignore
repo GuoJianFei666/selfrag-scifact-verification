@@ -12,3 +12,4 @@ models/
 artifacts/
 data/raw/
 data/processed/
+*.db

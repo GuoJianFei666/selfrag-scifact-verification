@@ -1,9 +1,12 @@
 """Frozen Contriever mean pooling and exact FAISS inner-product search."""
 from dataclasses import asdict
+import logging
 from pathlib import Path
 import re
 
 from .common import digest, file_hash, read_json, write_json
+
+log = logging.getLogger(__name__)
 
 
 class ContrieverEncoder:
@@ -27,6 +30,8 @@ class ContrieverEncoder:
         vectors = []
         with self.torch.inference_mode():
             for start in range(0, len(texts), batch_size):
+                if len(texts) > batch_size and (start == 0 or start % (batch_size * 20) == 0):
+                    log.info("encoding texts %s/%s", start, len(texts))
                 batch = self.tokenizer(texts[start:start + batch_size], padding=True, truncation=True,
                                        max_length=self.max_length, return_tensors="pt").to(self.device)
                 hidden = self.model(**batch).last_hidden_state
